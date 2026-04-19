@@ -1,0 +1,31 @@
+services:
+  audio-service:
+    build: ./audio-service
+    volumes:
+      - hls-data:/hls
+    ports:
+      - "8001:8001"
+    environment:
+      - HLS_DIR=/hls
+
+  ai-service:
+    build:
+      context: ./ai-service
+      args:
+        GENERATOR: ${GENERATOR:-algo}
+    depends_on:
+      - audio-service
+    environment:
+      - AUDIO_WS=ws://audio-service:8001/midi
+      - LOOKAHEAD_S=6.0
+      - GENERATOR=${GENERATOR:-algo}
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - audio-service
+
+volumes:
+  hls-data:
