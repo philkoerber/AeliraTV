@@ -1,5 +1,0 @@
-fastapi
-uvicorn[standard]
-websockets
-pyfluidsynth
-imageio-ffmpeg>=0.4.9
