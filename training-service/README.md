@@ -21,6 +21,10 @@ source .venv/bin/activate
 ./scripts/download_base_model.sh
 ```
 
+The Hub snapshot is roughly **450 MB** (mostly `model.safetensors`).
+
+**zsh:** If you add an inline `# ...` comment on the same line as a command, that line is only treated as a comment when `interactivecomments` is on (not in every config). Avoid patterns like `# ~446 ...` on the same line: zsh may still expand `~446` and error with `no such user or named directory`. Put notes on the line above, or write “about 450 MB” without a tilde before digits.
+
 Place at least **two** `.mid` or `.midi` files in `data/midi/` (for a piano-only impressionist model, use **solo piano** MIDI you have rights to use).
 
 ```bash

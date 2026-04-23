@@ -1,0 +1,17 @@
+{
+  "name": "@aeliratv/world",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -ws",
+    "build": "npm run build -ws",
+    "lint": "npm run lint -ws"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
+

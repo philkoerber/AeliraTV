@@ -1,0 +1,31 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: ./apps/server/Dockerfile
+    environment:
+      - PORT=2567
+    ports:
+      - "2567:2567"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npm", "run", "dev", "--workspace", "apps/server"]
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    environment:
+      - VITE_COLYSEUS_ENDPOINT=http://localhost:2567
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    working_dir: /app
+    command: ["npm", "run", "dev", "--workspace", "apps/web"]
+
