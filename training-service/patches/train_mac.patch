@@ -1,0 +1,130 @@
+diff --git a/train.py b/train.py
+index 75209b2..3589df1 100644
+--- a/train.py
++++ b/train.py
+@@ -12,6 +12,7 @@ from lightning import Trainer
+ from lightning.fabric.utilities import rank_zero_only
+ from lightning.pytorch.callbacks import ModelCheckpoint
+ from peft import LoraConfig, TaskType
++from safetensors.torch import load_file as safe_load_file
+ from safetensors.torch import save_file as safe_save_file
+ from torch import optim
+ from torch.optim.lr_scheduler import LambdaLR
+@@ -359,7 +360,7 @@ if __name__ == '__main__':
+         "--accelerator",
+         type=str,
+         default="gpu",
+-        choices=["cpu", "gpu", "tpu", "ipu", "hpu", "auto"],
++        choices=["cpu", "gpu", "mps", "tpu", "ipu", "hpu", "auto"],
+         help="accelerator",
+     )
+     parser.add_argument(
+@@ -380,14 +381,21 @@ if __name__ == '__main__':
+     parser.add_argument(
+         "--val-step", type=int, default=1600, help="valid and save every n steps, set 0 to valid and save every epoch"
+     )
++    parser.add_argument(
++        "--default-root-dir",
++        type=str,
++        default="",
++        help="Lightning default_root_dir for logs and checkpoints",
++    )
+ 
+     opt = parser.parse_args()
+     print(opt)
+ 
+-    if not os.path.exists("lightning_logs"):
+-        os.mkdir("lightning_logs")
+-    if not os.path.exists("sample"):
+-        os.mkdir("sample")
++    root_dir = opt.default_root_dir.strip()
++    lightning_logs_dir = os.path.join(root_dir, "lightning_logs") if root_dir else "lightning_logs"
++    sample_dir = os.path.join(root_dir, "sample") if root_dir else "sample"
++    os.makedirs(lightning_logs_dir, exist_ok=True)
++    os.makedirs(sample_dir, exist_ok=True)
+     pl.seed_everything(opt.seed)
+     print("---load dataset---")
+     if opt.config in config_name_list:
+@@ -398,41 +406,58 @@ if __name__ == '__main__':
+     midi_list = get_midi_list(opt.data)
+     random.shuffle(midi_list)
+     full_dataset_len = len(midi_list)
++    if full_dataset_len == 0:
++        raise ValueError(f"No MIDI files found under {opt.data}")
+     train_dataset_len = full_dataset_len - opt.data_val_split
+     train_midi_list = midi_list[:train_dataset_len]
+     val_midi_list = midi_list[train_dataset_len:]
++    if len(train_midi_list) == 0 or len(val_midi_list) == 0:
++        raise ValueError(
++            f"Invalid data/val split: {full_dataset_len} MIDI files, data-val-split={opt.data_val_split}. "
++            "Need more files or a smaller --data-val-split."
++        )
+     train_dataset = MidiDataset(train_midi_list, tokenizer, max_len=opt.max_len, aug=True, check_quality=opt.quality,
+                                 rand_start=True)
+     val_dataset = MidiDataset(val_midi_list, tokenizer, max_len=opt.max_len, aug=False, check_quality=opt.quality,
+                               rand_start=False)
++    pin_memory = torch.cuda.is_available()
++    persistent_workers_train = opt.workers_train > 0
++    persistent_workers_val = opt.workers_val > 0
+     train_dataloader = DataLoader(
+         train_dataset,
+         batch_size=opt.batch_size_train,
+         shuffle=True,
+-        persistent_workers=True,
++        persistent_workers=persistent_workers_train,
+         num_workers=opt.workers_train,
+-        pin_memory=True,
++        pin_memory=pin_memory,
+         collate_fn=train_dataset.collate_fn
+     )
+     val_dataloader = DataLoader(
+         val_dataset,
+         batch_size=opt.batch_size_val,
+         shuffle=False,
+-        persistent_workers=True,
++        persistent_workers=persistent_workers_val,
+         num_workers=opt.workers_val,
+-        pin_memory=True,
++        pin_memory=pin_memory,
+         collate_fn=val_dataset.collate_fn
+     )
+     print(f"train: {len(train_dataset)}  val: {len(val_dataset)}")
+-    torch.backends.cuda.enable_mem_efficient_sdp(True)
+-    torch.backends.cuda.enable_flash_sdp(True)
++    if torch.cuda.is_available():
++        torch.backends.cuda.enable_mem_efficient_sdp(True)
++        torch.backends.cuda.enable_flash_sdp(True)
+     model = TrainMIDIModel(config, lr=opt.lr, weight_decay=opt.weight_decay,
+                            warmup=opt.warmup_step, max_step=opt.max_step,
+                            sample_seq=opt.sample_seq, gen_example_interval=opt.gen_example_interval,
+                            example_batch=opt.batch_size_gen_example)
+     if opt.ckpt:
+-        ckpt = torch.load(opt.ckpt, map_location="cpu")
+-        state_dict = ckpt.get("state_dict", ckpt)
++        if opt.ckpt.endswith(".safetensors"):
++            state_dict = safe_load_file(opt.ckpt)
++        else:
++            try:
++                ckpt = torch.load(opt.ckpt, map_location="cpu", weights_only=False)
++            except TypeError:
++                ckpt = torch.load(opt.ckpt, map_location="cpu")
++            state_dict = ckpt.get("state_dict", ckpt)
+         model.load_state_dict(state_dict, strict=False)
+     elif opt.task == "lora":
+         raise ValueError("--ckpt must be set to train lora")
+@@ -458,6 +483,7 @@ if __name__ == '__main__':
+     )
+     callbacks = [checkpoint_callback]
+ 
++    default_root_dir = root_dir if root_dir else None
+     trainer = Trainer(
+         precision=opt.precision,
+         accumulate_grad_batches=opt.acc_grad,
+@@ -471,6 +497,7 @@ if __name__ == '__main__':
+         log_every_n_steps=1,
+         strategy="auto",
+         callbacks=callbacks,
++        default_root_dir=default_root_dir,
+     )
+     ckpt_path = opt.resume
+     if ckpt_path == "":

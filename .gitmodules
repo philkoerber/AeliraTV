@@ -1,0 +1,3 @@
+[submodule "training-service/vendor/midi-model"]
+	path = training-service/vendor/midi-model
+	url = https://github.com/SkyTNT/midi-model.git
