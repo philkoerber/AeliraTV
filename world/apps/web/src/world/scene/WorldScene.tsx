@@ -3,12 +3,15 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { chunkKey, heightAt } from "@aeliratv/shared-world";
 import { PlayerAvatar } from "./PlayerAvatar.js";
+import { DevWorldCapture } from "./DevWorldCapture.js";
 
 type Room = any;
 
 type Props = {
   room: Room;
   displayName: string;
+  /** Enables `window.__AELIRA_DEV__` and dev-only capture helpers (gated in `Game`). */
+  devAccessEnabled?: boolean;
 };
 
 const TERRAIN_SEED = 1337;
@@ -275,33 +278,11 @@ function WorldRoot({ room, displayName }: Props) {
       setPlayerIds(ids);
     };
 
-    players.onAdd = (_p: any, key: string) => {
-      const sp: SimPlayer = {
-        id: key,
-        name: String(_p.name ?? "Player"),
-        server: new THREE.Vector3(_p.x, 0, _p.z),
-        view: new THREE.Vector3(_p.x, 0, _p.z),
-        yaw: _p.yaw,
-        lastPos: new THREE.Vector3(_p.x, 0, _p.z),
-        lastT: performance.now() / 1000,
-        speed: 0,
-        moveAmount: { current: 0 },
-        viewRef: { current: new THREE.Vector3(_p.x, 0, _p.z) },
-        serverYawRef: { current: _p.yaw }
-      };
-      simRef.current.set(key, sp);
-      refreshIds();
-    };
-
-    players.onRemove = (_p: any, key: string) => {
-      simRef.current.delete(key);
-      refreshIds();
-    };
-
-    // Initial snapshot
-    refreshIds();
-    players.forEach((p: any, key: string) => {
-      if (simRef.current.has(key)) return;
+    const upsertSim = (p: any, key: string) => {
+      if (simRef.current.has(key)) {
+        refreshIds();
+        return;
+      }
       const sp: SimPlayer = {
         id: key,
         name: String(p.name ?? "Player"),
@@ -316,11 +297,24 @@ function WorldRoot({ room, displayName }: Props) {
         serverYawRef: { current: p.yaw }
       };
       simRef.current.set(key, sp);
-    });
+      refreshIds();
+    };
+
+    const removeSim = (_p: any, key: string) => {
+      simRef.current.delete(key);
+      refreshIds();
+    };
+
+    // Must use .onAdd(fn) — assignment `players.onAdd = fn` does not register $callbacks, so late joins never appear.
+    const offAdd = players.onAdd(upsertSim);
+    const offRemove = players.onRemove(removeSim);
+
+    // Safety net if anything is already present before listeners attach.
+    players.forEach((p: any, key: string) => upsertSim(p, key));
 
     return () => {
-      players.onAdd = undefined;
-      players.onRemove = undefined;
+      offAdd?.();
+      offRemove?.();
     };
   }, [room]);
 
@@ -419,7 +413,7 @@ function WorldRoot({ room, displayName }: Props) {
   );
 }
 
-export function WorldCanvas({ room, displayName }: Props) {
+export function WorldCanvas({ room, displayName, devAccessEnabled }: Props) {
   const sky = useMemo(() => new THREE.Color("#bfe7ff"), []);
 
   return (
@@ -436,6 +430,7 @@ export function WorldCanvas({ room, displayName }: Props) {
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
       }}
     >
+      {devAccessEnabled ? <DevWorldCapture terrainSeed={TERRAIN_SEED} /> : null}
       <WorldRoot room={room} displayName={displayName} />
     </Canvas>
   );

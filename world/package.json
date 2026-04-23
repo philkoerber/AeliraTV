@@ -7,11 +7,16 @@
   ],
   "scripts": {
     "dev": "npm run dev -ws",
+    "dev:e2e": "concurrently -k -n server,web -c blue,green \"npm run dev --workspace apps/server\" \"wait-on -t 120000 tcp:127.0.0.1:2567 && VITE_COLYSEUS_ENDPOINT=http://127.0.0.1:2567 npm run dev --workspace apps/web\"",
     "build": "npm run build -ws",
-    "lint": "npm run lint -ws"
+    "lint": "npm run lint -ws",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "@playwright/test": "^1.49.1",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.6.3",
+    "wait-on": "^8.0.1"
   }
 }
 

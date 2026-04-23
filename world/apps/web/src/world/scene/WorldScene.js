@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { chunkKey, heightAt } from "@aeliratv/shared-world";
 import { PlayerAvatar } from "./PlayerAvatar.js";
+import { DevWorldCapture } from "./DevWorldCapture.js";
 const TERRAIN_SEED = 1337;
 function SunLights() {
     const sun = useMemo(() => {
@@ -200,32 +201,11 @@ function WorldRoot({ room, displayName }) {
             players.forEach((_p, key) => ids.push(key));
             setPlayerIds(ids);
         };
-        players.onAdd = (_p, key) => {
-            const sp = {
-                id: key,
-                name: String(_p.name ?? "Player"),
-                server: new THREE.Vector3(_p.x, 0, _p.z),
-                view: new THREE.Vector3(_p.x, 0, _p.z),
-                yaw: _p.yaw,
-                lastPos: new THREE.Vector3(_p.x, 0, _p.z),
-                lastT: performance.now() / 1000,
-                speed: 0,
-                moveAmount: { current: 0 },
-                viewRef: { current: new THREE.Vector3(_p.x, 0, _p.z) },
-                serverYawRef: { current: _p.yaw }
-            };
-            simRef.current.set(key, sp);
-            refreshIds();
-        };
-        players.onRemove = (_p, key) => {
-            simRef.current.delete(key);
-            refreshIds();
-        };
-        // Initial snapshot
-        refreshIds();
-        players.forEach((p, key) => {
-            if (simRef.current.has(key))
+        const upsertSim = (p, key) => {
+            if (simRef.current.has(key)) {
+                refreshIds();
                 return;
+            }
             const sp = {
                 id: key,
                 name: String(p.name ?? "Player"),
@@ -240,10 +220,18 @@ function WorldRoot({ room, displayName }) {
                 serverYawRef: { current: p.yaw }
             };
             simRef.current.set(key, sp);
-        });
+            refreshIds();
+        };
+        const removeSim = (_p, key) => {
+            simRef.current.delete(key);
+            refreshIds();
+        };
+        const offAdd = players.onAdd(upsertSim);
+        const offRemove = players.onRemove(removeSim);
+        players.forEach((p, key) => upsertSim(p, key));
         return () => {
-            players.onAdd = undefined;
-            players.onRemove = undefined;
+            offAdd?.();
+            offRemove?.();
         };
     }, [room]);
     useFrame((state) => {
@@ -315,13 +303,13 @@ function WorldRoot({ room, displayName }) {
                 return (_jsx(PlayerAvatar, { displayName: isSelf ? displayName : sp.name, terrainSeed: TERRAIN_SEED, yawRef: yawRef, viewRef: sp.viewRef, moveAmountRef: sp.moveAmount, useCameraYaw: isSelf, serverYawRef: sp.serverYawRef }, id));
             })] }));
 }
-export function WorldCanvas({ room, displayName }) {
+export function WorldCanvas({ room, displayName, devAccessEnabled }) {
     const sky = useMemo(() => new THREE.Color("#bfe7ff"), []);
-    return (_jsx(Canvas, { shadows: true, dpr: [1, 2], gl: { antialias: false }, camera: { fov: 60, near: 0.1, far: 600, position: [0, 6, 10] }, onCreated: ({ gl, scene }) => {
+    return (_jsxs(Canvas, { shadows: true, dpr: [1, 2], gl: { antialias: false }, camera: { fov: 60, near: 0.1, far: 600, position: [0, 6, 10] }, onCreated: ({ gl, scene }) => {
             gl.setClearColor(sky, 1);
             scene.background = sky;
             scene.fog = new THREE.FogExp2(sky, 0.018);
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        }, children: _jsx(WorldRoot, { room: room, displayName: displayName }) }));
+        }, children: [devAccessEnabled ? _jsx(DevWorldCapture, { terrainSeed: TERRAIN_SEED }) : null, _jsx(WorldRoot, { room: room, displayName: displayName })] }));
 }

@@ -20,5 +20,5 @@ export function App() {
                                 const n = name.trim();
                                 if (n)
                                     setJoinedName(n);
-                            }, children: "Enter" })] }), _jsx("div", { className: "hint", children: "This is the minimal MVP: spawn at (0,0), walk around, and see other players." })] }) }));
+                            }, children: "Enter" })] }), _jsx("div", { className: "hint", children: "This is the minimal MVP: spawn at (0,0), run around, and see other players." })] }) }));
 }

@@ -20,9 +20,11 @@ type Props = {
 };
 
 const MODEL_URL = "/characters/player.glb";
-// glTF models often face +Z; our camera/movement basis treats "forward" as -Z in world space after yaw.
-// Tune this if a swapped asset faces sideways.
-const MODEL_YAW_OFFSET = Math.PI;
+// Movement uses (sin(yaw), cos(yaw)) in XZ; Three.js rotation.y maps local +Z to that same direction.
+// Add ±π/2 only if an asset's mesh forward axis is not +Z.
+const MODEL_YAW_OFFSET = 0;
+/** <1 slows the run/walk clip slightly (default glTF speed is often a bit snappy). */
+const LOCOMOTION_TIME_SCALE = 0.93;
 
 function pickActionName(actions: Record<string, THREE.AnimationAction | null>, candidates: string[]): string | null {
   const keys = Object.keys(actions);
@@ -131,8 +133,24 @@ export function PlayerAvatar({
     () => pickActionName(actions, ["idle", "Idle", "Survey", "Idle_001", "Armature|idle", "TPose"]),
     [actions]
   );
-  const walkName = useMemo(
-    () => pickActionName(actions, ["walk", "Walk", "run", "Run", "Walking", "Armature|walk"]),
+  /** Moving clip: prefer run over walk when the GLB has both (e.g. Xbot). */
+  const locomotionName = useMemo(
+    () =>
+      pickActionName(actions, [
+        "run",
+        "Run",
+        "running",
+        "Running",
+        "sprint",
+        "Sprint",
+        "jog",
+        "Jog",
+        "Armature|run",
+        "walk",
+        "Walk",
+        "Walking",
+        "Armature|walk"
+      ]),
     [actions]
   );
   const singleName = useMemo(() => {
@@ -146,9 +164,9 @@ export function PlayerAvatar({
   useEffect(() => {
     // Start idle-ish clip once available.
     const idle = idleName ? actions[idleName] : null;
-    const walk = walkName ? actions[walkName] : null;
+    const locomotion = locomotionName ? actions[locomotionName] : null;
     const single = singleName ? actions[singleName] : null;
-    const first = idle ?? walk ?? single;
+    const first = idle ?? locomotion ?? single;
     if (!first) return;
     first.reset().fadeIn(0.2).play();
     activeRef.current = first;
@@ -160,27 +178,27 @@ export function PlayerAvatar({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions, idleName, walkName, singleName]);
+  }, [actions, idleName, locomotionName, singleName]);
 
   useFrame((_state, dt) => {
     mixer.update(dt);
 
     const idle = idleName ? actions[idleName] : null;
-    const walk = walkName ? actions[walkName] : null;
+    const locomotion = locomotionName ? actions[locomotionName] : null;
     const single = singleName ? actions[singleName] : null;
 
-    if (single && !idle && !walk) {
-      const wantWalk = moveAmountRef.current > 0.08;
+    if (single && !idle && !locomotion) {
+      const wantMove = moveAmountRef.current > 0.08;
       single.enabled = true;
       single.paused = false;
-      // Cheap PS2-ish feel: one clip, two "modes" via timeScale + slight weighting.
-      const targetTs = wantWalk ? 1.05 : 0.35;
+      // Cheap PS2-ish feel: one clip, two "modes" via timeScale (faster when "running").
+      const targetTs = wantMove ? 1.45 * LOCOMOTION_TIME_SCALE : 0.35;
       single.timeScale = THREE.MathUtils.lerp(single.timeScale, targetTs, 1 - Math.exp(-dt * 10));
       if (!single.isRunning()) single.play();
       activeRef.current = single;
-    } else if (idle || walk) {
-      const wantWalk = moveAmountRef.current > 0.08;
-      const desired = wantWalk ? walk ?? idle : idle ?? walk;
+    } else if (idle || locomotion) {
+      const wantMove = moveAmountRef.current > 0.08;
+      const desired = wantMove ? locomotion ?? idle : idle ?? locomotion;
       if (!desired) return;
 
       if (activeRef.current && activeRef.current !== desired) {
@@ -192,6 +210,11 @@ export function PlayerAvatar({
         desired.reset().fadeIn(0.15).play();
         activeRef.current = desired;
       }
+
+      if (locomotion) {
+        locomotion.timeScale = wantMove ? LOCOMOTION_TIME_SCALE : 1;
+      }
+      if (idle) idle.timeScale = 1;
     }
 
     // Face movement direction: model forward is +Z in most glTF; tune if needed.

@@ -1,0 +1,42 @@
+name: World e2e
+
+on:
+  push:
+    paths:
+      - "world/**"
+      - ".github/workflows/world-e2e.yml"
+  pull_request:
+    paths:
+      - "world/**"
+      - ".github/workflows/world-e2e.yml"
+
+defaults:
+  run:
+    working-directory: world
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: world/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright smoke
+        run: npm run test:e2e
+        env:
+          CI: true
+      - name: Upload screenshot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-e2e-screenshot
+          path: world/test-results/screenshot.png
+          if-no-files-found: ignore

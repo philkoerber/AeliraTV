@@ -51,7 +51,7 @@ export function App() {
           </button>
         </div>
         <div className="hint">
-          This is the minimal MVP: spawn at (0,0), walk around, and see other players.
+          This is the minimal MVP: spawn at (0,0), run around, and see other players.
         </div>
       </div>
     </div>

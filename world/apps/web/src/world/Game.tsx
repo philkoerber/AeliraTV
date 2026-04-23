@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DevScreenshotPanel } from "../ui/DevScreenshotPanel.js";
+import { isDevAccessEnabled } from "./dev/worldDevAccess.js";
 import { joinWorld } from "./net.js";
 import { WorldCanvas } from "./scene/WorldScene.js";
 
@@ -11,6 +13,7 @@ export function Game({ name, endpoint }: Props) {
   const joinGenerationRef = useRef(0);
   const [room, setRoom] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const devAccess = useMemo(() => isDevAccessEnabled(), []);
 
   useEffect(() => {
     let disposed = false;
@@ -64,8 +67,9 @@ export function Game({ name, endpoint }: Props) {
   }
 
   return (
-    <div style={{ height: "100%" }}>
-      <WorldCanvas room={room} displayName={name} />
+    <div style={{ height: "100%", position: "relative" }}>
+      <WorldCanvas room={room} displayName={name} devAccessEnabled={devAccess} />
+      {devAccess ? <DevScreenshotPanel /> : null}
     </div>
   );
 }
