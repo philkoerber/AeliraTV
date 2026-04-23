@@ -24,9 +24,12 @@ const MODEL_URL = "/characters/player.glb";
 // Add ±π/2 only if an asset's mesh forward axis is not +Z.
 const MODEL_YAW_OFFSET = 0;
 /** <1 slows the run/walk clip slightly (default glTF speed is often a bit snappy). */
-const LOCOMOTION_TIME_SCALE = 0.93;
+const LOCOMOTION_TIME_SCALE = 0.5;
 
-function pickActionName(actions: Record<string, THREE.AnimationAction | null>, candidates: string[]): string | null {
+function pickActionName(
+  actions: Record<string, THREE.AnimationAction | null>,
+  candidates: string[],
+): string | null {
   const keys = Object.keys(actions);
   for (const c of candidates) {
     const exact = keys.find((k) => k === c);
@@ -68,7 +71,9 @@ function estimateStandingHeightMeters(root: THREE.Object3D): number {
   root.traverse((obj) => {
     const m = obj as THREE.Mesh;
     if (!m.isMesh) return;
-    const pos = m.geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+    const pos = m.geometry.getAttribute("position") as
+      | THREE.BufferAttribute
+      | undefined;
     if (!pos) return;
     for (let i = 0; i < pos.count; i++) {
       tmp.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
@@ -88,17 +93,20 @@ function estimateStandingHeightMeters(root: THREE.Object3D): number {
 
 export function PlayerAvatar({
   displayName,
-  terrainSeed = 1337,
+  terrainSeed = 7741,
   yawRef,
   viewRef,
   moveAmountRef,
   useCameraYaw,
-  serverYawRef
+  serverYawRef,
 }: Props) {
   const groupRef = useRef<THREE.Group>(null);
 
   const gltf = useGLTF(MODEL_URL);
-  const clone = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Object3D, [gltf.scene]);
+  const clone = useMemo(
+    () => SkeletonUtils.clone(gltf.scene) as THREE.Object3D,
+    [gltf.scene],
+  );
   const { animations } = gltf;
 
   // Normalize scale once: target ~1.75m tall (human-ish silhouette for an RPG MVP).
@@ -130,8 +138,16 @@ export function PlayerAvatar({
   const { actions, mixer } = useAnimations(animations, clone);
 
   const idleName = useMemo(
-    () => pickActionName(actions, ["idle", "Idle", "Survey", "Idle_001", "Armature|idle", "TPose"]),
-    [actions]
+    () =>
+      pickActionName(actions, [
+        "idle",
+        "Idle",
+        "Survey",
+        "Idle_001",
+        "Armature|idle",
+        "TPose",
+      ]),
+    [actions],
   );
   /** Moving clip: prefer run over walk when the GLB has both (e.g. Xbot). */
   const locomotionName = useMemo(
@@ -149,9 +165,9 @@ export function PlayerAvatar({
         "walk",
         "Walk",
         "Walking",
-        "Armature|walk"
+        "Armature|walk",
       ]),
-    [actions]
+    [actions],
   );
   const singleName = useMemo(() => {
     const keys = Object.keys(actions);
@@ -193,12 +209,16 @@ export function PlayerAvatar({
       single.paused = false;
       // Cheap PS2-ish feel: one clip, two "modes" via timeScale (faster when "running").
       const targetTs = wantMove ? 1.45 * LOCOMOTION_TIME_SCALE : 0.35;
-      single.timeScale = THREE.MathUtils.lerp(single.timeScale, targetTs, 1 - Math.exp(-dt * 10));
+      single.timeScale = THREE.MathUtils.lerp(
+        single.timeScale,
+        targetTs,
+        1 - Math.exp(-dt * 10),
+      );
       if (!single.isRunning()) single.play();
       activeRef.current = single;
     } else if (idle || locomotion) {
       const wantMove = moveAmountRef.current > 0.08;
-      const desired = wantMove ? locomotion ?? idle : idle ?? locomotion;
+      const desired = wantMove ? (locomotion ?? idle) : (idle ?? locomotion);
       if (!desired) return;
 
       if (activeRef.current && activeRef.current !== desired) {
@@ -232,13 +252,18 @@ export function PlayerAvatar({
   return (
     <group ref={groupRef}>
       <primitive object={clone} />
-      <Html position={[0, normalized.headY + 0.08, 0]} center distanceFactor={10} style={{ pointerEvents: "none" }}>
+      <Html
+        position={[0, normalized.headY + 0.08, 0]}
+        center
+        distanceFactor={10}
+        style={{ pointerEvents: "none" }}
+      >
         <div
           style={{
             color: "rgba(255,255,255,0.92)",
             fontSize: "12px",
             textShadow: "0 2px 10px rgba(0,0,0,0.85)",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
           }}
         >
           {displayName}

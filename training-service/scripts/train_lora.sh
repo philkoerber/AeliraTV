@@ -35,7 +35,7 @@ else
 fi
 
 if python -c "import torch; exit(0 if torch.backends.mps.is_available() else 1)" 2>/dev/null; then
-  ACCEL=mps
+  ACCEL=auto
   DEVICES=1
 else
   ACCEL=cpu

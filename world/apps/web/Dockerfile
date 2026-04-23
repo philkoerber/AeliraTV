@@ -10,6 +10,8 @@ RUN npm install
 
 COPY . .
 
+RUN npm run build --workspace=@aeliratv/shared-world
+
 EXPOSE 5173
 
 CMD ["npm", "run", "dev", "--workspace", "apps/web"]

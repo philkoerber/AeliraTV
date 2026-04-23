@@ -10,7 +10,8 @@
     "dev:e2e": "concurrently -k -n server,web -c blue,green \"npm run dev --workspace apps/server\" \"wait-on -t 120000 tcp:127.0.0.1:2567 && VITE_COLYSEUS_ENDPOINT=http://127.0.0.1:2567 npm run dev --workspace apps/web\"",
     "build": "npm run build -ws",
     "lint": "npm run lint -ws",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:unit": "npm run test -w @aeliratv/shared-world"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

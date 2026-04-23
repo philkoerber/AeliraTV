@@ -1,0 +1,38 @@
+---
+description: After changing the web 3D world, verify with dev coordinate screenshots
+globs: world/apps/web/src/world/**/*
+alwaysApply: false
+---
+
+# World scene changes — visual verification
+
+When you change anything that affects **how the world looks** (meshes, materials, lighting, terrain integration, camera-relative layout, shaders under `world/apps/web/src/world/`), treat a **coordinate-based screenshot** as the default acceptance check unless the user explicitly says not to.
+
+## How to capture
+
+1. **Dev access** must be on so `window.__AELIRA_DEV__` exists:
+   - Local Vite: open the app with `?dev=1`, or in dev only `localStorage.setItem("aeliraDevAccess","1")` then reload.
+   - Production-like build: needs `VITE_DEV_ACCESS` truthy at build time plus `?dev=1` (and `secret` if `VITE_DEV_ACCESS_SECRET` is set). See `world/apps/web/src/world/dev/worldDevAccess.ts`.
+
+2. Enter the world (same flow as a user: name + Enter), wait until the scene is ready.
+
+3. Call **`window.__AELIRA_DEV__.captureScreenshot(opts)`** — returns a PNG **data URL**. Use at least one **wide** shot (e.g. origin / landmark) and, when the change is localized, a shot from **near the edited feature** with `lookAt` aimed at it.
+
+   Example:
+
+   ```js
+   window.__AELIRA_DEV__.captureScreenshot({
+     position: { x: 14, z: 10 },
+     lookAt: { x: 0, z: 0 },
+     fov: 50
+   });
+   ```
+
+   Options: `position` / `lookAt` (`x`,`z` required; `y` optional — defaults use terrain height + `eyeOffset` / `lookOffset`), `fov`, `near`, `far`. Implementation: `world/apps/web/src/world/scene/DevWorldCapture.tsx`.
+
+4. **Automation:** `world/e2e/world-dev-capture.spec.ts` shows Playwright waiting for the API then saving PNG from the data URL — reuse that pattern for scripted checks.
+
+## What “verified” means
+
+- You actually obtained a capture (browser tools / Playwright / MCP browser) or ran the dev-capture e2e against a dev-enabled build — not only “it should look fine.”
+- If dev access cannot be enabled in the environment, say so and list the closest alternative (e.g. standard `page.screenshot` without controlled world angles, or user manual check).

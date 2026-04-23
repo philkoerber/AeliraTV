@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DevScreenshotPanel } from "../ui/DevScreenshotPanel.js";
 import { isDevAccessEnabled } from "./dev/worldDevAccess.js";
 import { joinWorld } from "./net.js";
-import { WorldCanvas } from "./scene/WorldScene.js";
+import { WorldCanvas } from "./scene/WorldScene";
 
 type Props = {
   name: string;

@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { Game } from "../world/Game.js";
+import { Game } from "../world/Game";
 
 export function App() {
   const [name, setName] = useState("");
   const [joinedName, setJoinedName] = useState<string | null>(null);
 
   const endpoint = useMemo(() => {
-    return import.meta.env.VITE_COLYSEUS_ENDPOINT?.trim() || "http://localhost:2567";
+    return (
+      import.meta.env.VITE_COLYSEUS_ENDPOINT?.trim() || "http://localhost:2567"
+    );
   }, []);
 
   if (joinedName) {
@@ -26,7 +28,6 @@ export function App() {
   return (
     <div className="shell">
       <div className="card">
-        <h2 style={{ margin: "0 0 12px 0" }}>World</h2>
         <div className="row">
           <input
             value={name}
@@ -50,11 +51,7 @@ export function App() {
             Enter
           </button>
         </div>
-        <div className="hint">
-          This is the minimal MVP: spawn at (0,0), run around, and see other players.
-        </div>
       </div>
     </div>
   );
 }
-
