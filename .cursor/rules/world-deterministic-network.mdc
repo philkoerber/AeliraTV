@@ -1,0 +1,50 @@
+---
+description: World Colyseus authority, deterministic contract, shared-world, chunk data split
+globs: world/**/*
+alwaysApply: false
+---
+
+# World — network and determinism
+
+Merged from the world-building strategy: **grow from a deterministic contract and profiling gates**, not from ad-hoc features.
+
+## Non-negotiables
+
+- **Gameplay truth is server-side.** Only the server mutates `Room` schema state directly. Clients change shared reality via **messages** (or validated join options), not by locally writing authoritative fields.
+- **`packages/shared-world` is the canonical deterministic generator.** Pure functions / modules: **no React**, no Colyseus room imports, no browser-only APIs. Server and client **must** get the same outputs for the same inputs (seed + rules + coordinates). Add tests for same-input same-output and seam/coordinate edge cases.
+- **Version everything that affects recomputation.** Join/bootstrap must yield a **canonical world contract** the server owns (e.g. `worldSeed`, `rulesetVersion`, `generatorBuild`, chunk size, LOD profile constants, authored overlay version). If the contract changes, clients **invalidate caches and rebuild chunks** — never guess a revision.
+- **Do not mirror giant world datasets in Colyseus schema.** Schema holds the **minimum shared truth** (players, dynamic entities, interactables, walkability overrides, authored POI state, persistent deltas). Large chunk maps / procedural payloads: **messages** (chunk interest, preload hints, chunk revisions) or recompute locally from the contract — not full world state in schema. Prefer small authoritative state + message-driven manifests over mirroring scene complexity.
+
+## State vs messages (Colyseus)
+
+- **State / schema:** persistent, join-relevant, every client must reconstruct the same picture of *truth*.
+- **Messages:** one-shot or streaming **transport** current clients need; **not** required for late joiners to rebuild history from room state alone.
+
+## World contract (conceptual)
+
+Treat one **immutable-for-the-session** contract after join: seed, ruleset version, generator build, chunk size, LOD profile, biome constants, **authored origin definition** around `(0,0)`, persistent delta version. Bootstrap via join options validated in `onAuth` / `onJoin`, then echo in state or a guaranteed early message.
+
+## Data classes
+
+1. **Canonical schema:** players, dynamics, interactables, authoritative walkability overrides, authored POI / edits.
+2. **Recomputable:** base height, biome weights, decorative scatter, low-importance landmark variants, ambient particles, non-authoritative material variation.
+3. **Ephemeral transport:** chunk interest, preload manifests, audio/FX triggers, one-shot notifications.
+
+## Generator pipeline (staged)
+
+Order of dependency: **large-scale landmass / biome fields → terrain detail → features → object placement.** Use **world-space sampled fields** with **bounded local dependencies** so chunks can regenerate independently while staying continuous with neighbors — avoid “each chunk is its own unrelated random world.”
+
+## Origin `(0,0)` — piano / authored core
+
+- Treat as a **generation exception zone**, not a late asset drop: **reserved radius**, stable terrain “bowl” or meadow, **authored mask** queried before rocks/trees/ruins/blockers.
+- Surrounding procedural systems should **frame** the origin: long sightlines, gentle approaches, mist pockets, distant silhouette landmarks.
+- **Visual hierarchy:** tactile calm foreground at piano → mid exploration (terrain, sparse kits, mist in depressions) → far skyline (silhouettes, haze, low-cost motion).
+
+## Roadmap gates (order)
+
+1. **Foundation:** metrics (draw calls, triangles, chunk build/swap time, patch bytes, cache size, frame percentiles) before big world features.
+2. **Deterministic world pass:** shared-world as source of truth; primitives first; seam tests before pretty terrain.
+3. **Origin pass:** piano meadow + masks + atmosphere at `(0,0)` before full biome decoration.
+4. **Population:** instancing/batching rules; only after chunking + origin are solid.
+5. **Atmosphere:** sky, fog, mist, particles, distant masses **after** playable stability.
+6. **Scale:** persistence overlays, chunk delivery refinements; **floating-origin / rebasing** as a deliberate milestone if coordinates stretch precision — not mixed into first terrain.

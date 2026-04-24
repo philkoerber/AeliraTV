@@ -4,6 +4,11 @@ export function normalizeSeed(seed: string | number | undefined): number {
   return hashStringToInt32(String(seed));
 }
 
+/** Server-owned canonical seed string for a Colyseus room (not trusting client join options). */
+export function canonicalWorldSeedFromRoomId(roomId: string): string {
+  return `w:${roomId}`;
+}
+
 function hashStringToInt32(s: string): number {
   // FNV-1a 32-bit
   let h = 0x811c9dc5;

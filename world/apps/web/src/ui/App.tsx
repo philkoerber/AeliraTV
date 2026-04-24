@@ -14,13 +14,11 @@ export function App() {
   if (joinedName) {
     return (
       <div className="gameRoot">
-        <div className="overlayTopLeft">
-          <div>
-            <strong>{joinedName}</strong>
-          </div>
-          <div>WASD to move. Click to lock mouse. Esc to unlock.</div>
-        </div>
-        <Game name={joinedName} endpoint={endpoint} />
+        <Game
+          name={joinedName}
+          endpoint={endpoint}
+          onExit={() => setJoinedName(null)}
+        />
       </div>
     );
   }

@@ -24,7 +24,6 @@ test("world: join, WebGL canvas, screenshot artifact", async ({ page }) => {
     { timeout: 30_000 }
   );
 
-  // One paint after GL context exists (models/async decode).
   await new Promise((r) => setTimeout(r, 750));
 
   const outDir = path.join(process.cwd(), "test-results");

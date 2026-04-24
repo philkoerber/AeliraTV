@@ -1,0 +1,51 @@
+---
+description: R3F + three.js performance, chunks, LOD, networking visuals for world web client
+globs: world/apps/web/**/*
+alwaysApply: false
+---
+
+# World web — React Three Fiber and rendering
+
+R3F is the **scene graph and orchestration** layer. **Hot paths** stay out of React reconciliation.
+
+## Frame loop and React
+
+- **Fast / per-frame updates:** read network or input in the frame loop; **mutate refs / three.js objects** (`position`, `quaternion`, `matrix`, etc.). Use **`useFrame`**, not `useState` / `useEffect` for high-frequency values.
+- **Do not** `setState` in tight loops or every tick for transforms — use refs; React docs align: refs hold values that must **not** trigger re-renders.
+- **Bind slowly changing props** at the boundary (chunk mount, LOD tier change), not every replicated float.
+
+## Chunk roots and lifecycle
+
+- A **chunk is a stable root** while loaded. Prefer **`visible` toggles** and in-place LOD swaps over **unmounting** large subtrees (avoids buffer/material re-init and shader recompile churn).
+- **`useLoader`** for assets (cached). Prefer loading **low LOD first**, upgrade only what is **near and visible**.
+- **Static content:** after transforms finalize, consider **`matrixAutoUpdate = false`** for static meshes; rely on default **`frustumCulled`**; use **`traverseVisible`** patterns when batching visibility.
+
+## Draw calls and primitives
+
+- Budget mindset: **a few hundred draw calls healthy**, **~1000** is already outer edge — measure continuously.
+- **Same geometry + same material (many copies):** `THREE.InstancedMesh` (drei **`Instances`** as declarative sugar).
+- **Same material, varied geometry:** `THREE.BatchedMesh`.
+- **Hero / interactable / low count:** ordinary meshes + **`THREE.LOD`** or drei **`Detailed`**.
+- **Shadows:** expensive (extra renders from light POV). **Selective, near-camera** first; **CSM** only as a targeted upgrade when budgets allow.
+
+## Camera and multiplayer (walking-only)
+
+- **Do not** drive the chase / follow camera directly from raw replicated snapshots at render rate — packets are sparser than frames.
+- **Local player:** predicted / smoothed pose reconciling to server truth in the frame loop.
+- **Remote players:** **buffered interpolation** between past snapshots (small playback delay). Aligns with common Colyseus / netcode tutorials: interpolate between known states, optionally predict on a fixed tick mental model.
+
+## Device adaptation
+
+- Use **PerformanceMonitor** (drei) or equivalent to adjust **DPR**, quality tiers, and feature flags from **measured FPS**.
+- Trade down **back-buffer resolution**, texture sizes, and shadow quality before dropping core structure.
+- Maintain a **VRAM / memory budget**; chunk systems **own disposal** of geometries, materials, textures (GLTF + textures need explicit dispose — do not rely on GC alone).
+
+## Content pipeline (web)
+
+- **glTF / GLB** as standard delivery; pipeline includes **Draco / Meshopt**, **Basis / KTX2** where applicable (`GLTFLoader` extensions, `KTX2Loader`).
+- **Tiers:** hero (piano, key landmarks) → **kit** modules (instanced/batched repeats) → **far-field** silhouettes / impostors / minimal geometry.
+- **Fog / haze:** use for **composition and LOD hiding** — epic scale without uniform high density.
+
+## Atmosphere pass order
+
+Grandeur from **light, haze, spacing, silhouettes** — add heavy sky/particles/mist layers **after** chunking, origin, and population passes are stable; otherwise effects mask unsustainable cost.

@@ -5,6 +5,8 @@
 html,
 body {
   margin: 0;
+  width: 100%;
+  min-height: 100dvh;
   height: 100%;
   background: #0b0d12;
   color: #e8e8e8;
@@ -13,10 +15,13 @@ body {
 }
 
 #root {
+  width: 100%;
+  min-height: 100dvh;
   height: 100%;
 }
 
 .shell {
+  min-height: 100dvh;
   height: 100%;
   display: grid;
   place-items: center;
@@ -70,6 +75,8 @@ button:hover {
 }
 
 .gameRoot {
+  width: 100%;
+  min-height: 100dvh;
   height: 100%;
   position: relative;
 }
@@ -86,5 +93,133 @@ button:hover {
   padding: 8px 10px;
   border-radius: 10px;
   backdrop-filter: blur(8px);
+}
+
+.mvpCenter {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  gap: 16px;
+}
+
+.mvpError {
+  color: #ffb4b4;
+}
+
+.mvpMuted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mvpGame {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.mvpHud {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.mvpSep {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
+.mvpHint {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.45;
+  max-width: 52ch;
+}
+
+.mvpLeave {
+  margin-top: 4px;
+}
+
+.mvpTableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.mvpTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mvpTable th,
+.mvpTable td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mvpTable th {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: rgba(11, 13, 18, 0.95);
+}
+
+.mvpMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.perfHud {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(235, 240, 250, 0.92);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.perfHudTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.perfHudOk {
+  color: rgba(170, 230, 190, 0.95);
+}
+
+.perfHudWarn {
+  color: rgba(255, 214, 140, 0.95);
+}
+
+.perfHudBad {
+  color: rgba(255, 160, 160, 0.95);
+}
+
+.perfHudMuted {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.55);
 }
 

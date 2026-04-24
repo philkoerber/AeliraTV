@@ -7,11 +7,11 @@
   ],
   "scripts": {
     "dev": "npm run dev -ws",
-    "dev:e2e": "concurrently -k -n server,web -c blue,green \"npm run dev --workspace apps/server\" \"wait-on -t 120000 tcp:127.0.0.1:2567 && VITE_COLYSEUS_ENDPOINT=http://127.0.0.1:2567 npm run dev --workspace apps/web\"",
-    "build": "npm run build -ws",
+    "dev:e2e": "npm run build -w @aeliratv/shared-world && concurrently -k -n server,web -c blue,green \"npm run dev --workspace apps/server\" \"wait-on -t 120000 tcp:127.0.0.1:2567 && VITE_COLYSEUS_ENDPOINT=http://127.0.0.1:2567 npm run dev --workspace apps/web\"",
+    "build": "npm run build -w @aeliratv/shared-world && npm run build -w @aeliratv/world-server && npm run build -w @aeliratv/world-web",
     "lint": "npm run lint -ws",
     "test:e2e": "playwright test",
-    "test:unit": "npm run test -w @aeliratv/shared-world"
+    "test:unit": "npm run test -w @aeliratv/shared-world && npm run test -w @aeliratv/world-web"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

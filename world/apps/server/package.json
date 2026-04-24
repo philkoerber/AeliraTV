@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "prebuild": "npm run build -w @aeliratv/shared-world",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "echo \"(no lint yet)\""
   },
   "dependencies": {
+    "@aeliratv/shared-world": "*",
     "@colyseus/core": "^0.15.0",
     "@colyseus/schema": "^1.0.0",
     "@colyseus/ws-transport": "^0.15.0",

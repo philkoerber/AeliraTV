@@ -7,10 +7,11 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "test": "vitest run",
     "lint": "echo \"(no lint yet)\""
   },
   "dependencies": {
-    "@aeliratv/shared-world": "0.0.0",
+    "@aeliratv/shared-world": "*",
     "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
     "colyseus.js": "^0.15.0",
@@ -24,7 +25,7 @@
     "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^3.0.5"
   }
 }
-
