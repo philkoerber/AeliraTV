@@ -48,10 +48,75 @@ function lerpAngleShortest(a: number, b: number, t: number): number {
   return a + d * t;
 }
 
-/** Square window half-size in chunk units: 1 => 3×3, 2 => 5×5. */
-const CHUNK_VIEW_RADIUS = 1;
+/** Square window half-size in chunk units: 1 => 3×3, 2 => 5×5 (server clamps interest to 0..2). */
+const CHUNK_VIEW_RADIUS = 2;
+
+/** One `<Sky />` for horizon depth; set false if perf HUD regresses. */
+const ENABLE_SKY = true;
+
+/** Horizon / fog tint (linear fog + clear color family). */
+const HORIZON_COLOR = "#8aa4b8";
+const FOG_COLOR = "#6d8498";
 
 const SEGMENTS_PER_CHUNK = 14;
+
+/**
+ * Horizontal distance from the chunk-window center to the outer boundary of loaded
+ * terrain along ±X/±Z, for a square of (2*radius+1) chunks each `chunkSize` wide.
+ * Outer face of the farthest ring: (radius + 0.5) * chunkSize.
+ */
+function terrainWindowEdgeDistanceXZ(chunkSize: number, radius: number): number {
+  return (radius + 0.5) * chunkSize;
+}
+
+/**
+ * Linear fog tuned so most of the loaded patch stays clear while the void past tile
+ * edges blends into `FOG_COLOR` (see plan: edge-biased fog).
+ */
+function linearFogNearFarForChunkWindow(
+  chunkSize: number,
+  radius: number,
+): { near: number; far: number } {
+  const edge = terrainWindowEdgeDistanceXZ(chunkSize, radius);
+  // Slightly steeper band vs edge so the last slice of terrain blends before the void (combo with larger window).
+  return {
+    near: Math.max(20, edge * 0.76),
+    far: Math.min(205, Math.max(edge * 1.12, edge + chunkSize * 0.55)),
+  };
+}
+
+type TerrainGrassMaterialOpts = { vertexColors: boolean };
+
+function createTerrainGrassMaterial(
+  opts: TerrainGrassMaterialOpts,
+): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: "#c8d8ce",
+    metalness: 0.04,
+    roughness: 0.93,
+    vertexColors: opts.vertexColors,
+    flatShading: false,
+  });
+}
+
+/** Deterministic [0,1) from integer grid — stable across runs (visual only). */
+function hash01FromGrid(ix: number, iz: number): number {
+  let h = Math.imul(ix, 374761393) + Math.imul(iz, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h >>> 0) * 2 ** -32;
+}
+
+function writeGrassVertexColor(x: number, z: number, out: Float32Array, o: number): void {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const t = hash01FromGrid(ix, iz);
+  const t2 = hash01FromGrid(ix + 101, iz - 67);
+  out[o] = 0.09 + 0.07 * t;
+  out[o + 1] = 0.16 + 0.11 * t2;
+  out[o + 2] = 0.07 + 0.06 * t;
+}
+
+const SKY_SUN_POSITION = new THREE.Vector3(22, 36, -48);
 
 type WorldContractSlice = {
   worldSeed: string;
@@ -112,6 +177,18 @@ function buildChunkSurfaceGeometry(
       positions[pi++] = z;
     }
   }
+  const colors = new Float32Array((seg + 1) * (seg + 1) * 3);
+  let ci = 0;
+  for (let iz = 0; iz <= seg; iz++) {
+    for (let ix = 0; ix <= seg; ix++) {
+      const u = ix / seg;
+      const v = iz / seg;
+      const x = x0 + u * S;
+      const z = z0 + v * S;
+      writeGrassVertexColor(x, z, colors, ci);
+      ci += 3;
+    }
+  }
   const W = seg + 1;
   for (let iz = 0; iz < seg; iz++) {
     for (let ix = 0; ix < seg; ix++) {
@@ -124,6 +201,7 @@ function buildChunkSurfaceGeometry(
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   g.setIndex(indices);
   g.computeVertexNormals();
   return g;
@@ -134,11 +212,13 @@ function ChunkTile({
   chunkSize,
   cfg,
   segments,
+  material,
 }: {
   chunkKeyProp: string;
   chunkSize: number;
   cfg: TerrainConfig;
   segments: number;
+  material: THREE.MeshStandardMaterial;
 }): React.ReactElement {
   const { cx, cz } = parseChunkKey(chunkKeyProp);
 
@@ -156,11 +236,7 @@ function ChunkTile({
     [geom],
   );
 
-  return (
-    <mesh geometry={geom} receiveShadow>
-      <meshStandardMaterial color="#1a2433" metalness={0.05} roughness={0.92} />
-    </mesh>
-  );
+  return <mesh geometry={geom} material={material} receiveShadow />;
 }
 
 function ChunkTerrainCoordinator({
@@ -174,6 +250,17 @@ function ChunkTerrainCoordinator({
   terrainCfg: TerrainConfig;
   chunkSize: number;
 }): React.ReactElement {
+  const terrainMaterial = useMemo(
+    () => createTerrainGrassMaterial({ vertexColors: true }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      terrainMaterial.dispose();
+    },
+    [terrainMaterial],
+  );
+
   const [keys, setKeys] = useState<string[]>(() =>
     chunkKeysInSquare(0, 0, CHUNK_VIEW_RADIUS),
   );
@@ -214,6 +301,7 @@ function ChunkTerrainCoordinator({
           chunkSize={chunkSize}
           cfg={terrainCfg}
           segments={SEGMENTS_PER_CHUNK}
+          material={terrainMaterial}
         />
       ))}
     </group>
@@ -423,6 +511,16 @@ function Scene({ room }: Props) {
       contract ? terrainConfigFromContract({ worldSeed: contract.worldSeed }) : null,
     [contract],
   );
+
+  const { fogNear, fogFar } = useMemo(() => {
+    const chunkSize = contract?.chunkSize ?? 64;
+    const { near, far } = linearFogNearFarForChunkWindow(
+      chunkSize,
+      CHUNK_VIEW_RADIUS,
+    );
+    return { fogNear: near, fogFar: far };
+  }, [contract?.chunkSize]);
+
   const originRingY = terrainCfg
     ? surfaceHeightAt(0, 0, terrainCfg) + 0.04
     : 0.04;
@@ -448,14 +546,25 @@ function Scene({ room }: Props) {
 
   return (
     <KeyboardControls map={map}>
-      <color attach="background" args={["#070910"]} />
-      <fog attach="fog" args={["#0a0d14", 18, 95]} />
+      <color attach="background" args={[HORIZON_COLOR]} />
+      <fog attach="fog" args={[FOG_COLOR, fogNear, fogFar]} />
 
-      <ambientLight intensity={0.35} />
+      {ENABLE_SKY ? (
+        <Sky
+          distance={450000}
+          mieCoefficient={0.0032}
+          mieDirectionalG={0.75}
+          rayleigh={0.55}
+          turbidity={8}
+          sunPosition={SKY_SUN_POSITION}
+        />
+      ) : null}
+
+      <ambientLight intensity={0.44} />
       <directionalLight
         castShadow
         position={[18, 28, 10]}
-        intensity={1.05}
+        intensity={1.14}
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
         shadow-camera-far={80}
@@ -476,16 +585,18 @@ function Scene({ room }: Props) {
         <mesh rotation-x={-Math.PI / 2} receiveShadow position={[0, 0, 0]}>
           <planeGeometry args={[400, 400]} />
           <meshStandardMaterial
-            color="#1a2433"
-            metalness={0.05}
-            roughness={0.92}
+            color="#c8d8ce"
+            metalness={0.04}
+            roughness={0.93}
+            vertexColors={false}
+            flatShading={false}
           />
         </mesh>
       )}
 
       <Grid
         infiniteGrid
-        fadeDistance={62}
+        fadeDistance={100}
         fadeStrength={1.2}
         sectionSize={5}
         cellSize={1}
@@ -559,7 +670,7 @@ export function WorldCanvas({ room }: Props) {
       <Canvas
         style={{ width: "100%", height: "100%", display: "block" }}
         shadows
-        camera={{ fov: 55, near: 0.1, far: 200, position: [0, 6, 10] }}
+        camera={{ fov: 55, near: 0.1, far: 240, position: [0, 6, 10] }}
         dpr={dpr}
         onPointerDown={requestLock}
       >
