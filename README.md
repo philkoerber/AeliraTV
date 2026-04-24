@@ -59,6 +59,26 @@ cd ai-service && pip install .
 python -m app.main
 ```
 
+## Deploy "world" to `philippkoerber.com/world`
+
+This repo includes a minimal multiplayer 3D web game stack in `world/`.
+
+The following commands build the `world` frontend with the correct base path
+and server endpoint, then deploy it behind nginx at `/world` and proxy the
+Colyseus server via `/world-colyseus`.
+
+```bash
+cd /root/aeliratv
+docker compose -f world/docker-compose.yml run --rm \
+  -e VITE_COLYSEUS_ENDPOINT=https://philippkoerber.com/world-colyseus \
+  web sh -lc "npm run build --workspace packages/shared-world && npm run build --workspace apps/web -- --base=/world/"
+
+rm -rf /var/www/philippkoerber.com/world/*
+cp -a /root/aeliratv/world/apps/web/dist/. /var/www/philippkoerber.com/world/
+chown -R www-data:www-data /var/www/philippkoerber.com/world
+systemctl reload nginx
+```
+
 ## Known limitations
 
 - HLS adds 3–6 s of latency. This is by design (simplest transport).
