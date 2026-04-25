@@ -25,6 +25,14 @@ export type PerfSnapshot = {
   lastChunkBuildMs: number;
   lastChunkSwapMs: number;
   chunkEvictionsTotal: number;
+  /** Sum of all decor instances currently merged for rendering (all assets). */
+  propsInstanceTotal: number;
+  /** Worst per-chunk decor matrix rebuild time (ms) in the props coordinator. */
+  propsLastMatrixBuildMs: number;
+  /** Worst per-asset merge + GPU attribute upload pass (ms). */
+  propsLastMergeMs: number;
+  /** Number of decor instances dropped due to instancing max clamp (cumulative session). */
+  propsMergeClampHits: number;
   /** Colyseus (filled by net probe) */
   statePatchesTotal: number;
   statePatchesPerSec: number;
@@ -59,6 +67,10 @@ export const perfSnapshot: PerfSnapshot = {
   lastChunkBuildMs: 0,
   lastChunkSwapMs: 0,
   chunkEvictionsTotal: 0,
+  propsInstanceTotal: 0,
+  propsLastMatrixBuildMs: 0,
+  propsLastMergeMs: 0,
+  propsMergeClampHits: 0,
   statePatchesTotal: 0,
   statePatchesPerSec: 0,
   outgoingSendsTotal: 0,

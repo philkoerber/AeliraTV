@@ -5,7 +5,6 @@ import path from "node:path";
 test("world: join, WebGL canvas, screenshot artifact", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByPlaceholder("Your name").fill("E2E");
   await page.getByRole("button", { name: "Enter" }).click();
 
   const canvas = page.locator("canvas").first();

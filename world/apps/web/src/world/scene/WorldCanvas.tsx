@@ -1,6 +1,7 @@
 import {
   surfaceHeightAt,
   terrainConfigFromContract,
+  type DecorOverrides,
   type TerrainConfig,
 } from "@aeliratv/shared-world";
 import {
@@ -26,6 +27,17 @@ import * as THREE from "three";
 import { PerfProbe } from "../perf/PerfProbe.js";
 import { PlayerCharacter } from "./PlayerCharacter";
 import {
+  ChunkPropsCoordinator,
+  type ChunkPropsBuildsHandle,
+} from "./props/ChunkPropsCoordinator.js";
+import {
+  ChunkPropsRenderer,
+} from "./props/ChunkPropsRenderer.js";
+import {
+  decorOverridesFromOverlayMessage,
+  type DecorOverlayMessageV1,
+} from "./props/decorOverlay.js";
+import {
   CHUNK_PRELOAD_RADIUS,
   ChunkTerrainCoordinator,
   linearFogNearFarForChunkWindow,
@@ -47,6 +59,7 @@ const ORIGIN_PIANO_Y_OFFSET = 0;
 // Character rendering/animation lives in `PlayerCharacter.tsx`.
 
 const SKY_TEXTURE_URL = "/sky/sky.png";
+const TEXTURE_SKY_Y_OFFSET = -0.35;
 
 /** ~1 - exp(-λ dt) for stable smoothing across frame rates (use `useFrame` `delta`, not `clock.getDelta()`). */
 function dampExp(dt: number, lambda: number): number {
@@ -120,7 +133,11 @@ function TexturedSkySphere(): React.ReactElement {
   useFrame(() => {
     const m = meshRef.current;
     if (!m) return;
-    m.position.copy(camera.position);
+    m.position.set(
+      camera.position.x,
+      camera.position.y + TEXTURE_SKY_Y_OFFSET,
+      camera.position.z,
+    );
   });
 
   return (
@@ -139,6 +156,8 @@ function TexturedSkySphere(): React.ReactElement {
 type WorldContractSlice = {
   worldSeed: string;
   chunkSize: number;
+  rulesetVersion: number;
+  generatorBuild: number;
 };
 
 function useWorldContract(room: Room): WorldContractSlice | null {
@@ -146,7 +165,12 @@ function useWorldContract(room: Room): WorldContractSlice | null {
 
   useEffect(() => {
     const sync = (): void => {
-      const s = room.state as { worldSeed?: string; chunkSize?: number };
+      const s = room.state as {
+        worldSeed?: string;
+        chunkSize?: number;
+        rulesetVersion?: number;
+        generatorBuild?: number;
+      };
       const seed =
         typeof s.worldSeed === "string" && s.worldSeed.length > 0
           ? s.worldSeed
@@ -157,14 +181,31 @@ function useWorldContract(room: Room): WorldContractSlice | null {
         s.chunkSize > 0
           ? s.chunkSize
           : 0;
+      const rulesetVersion =
+        typeof s.rulesetVersion === "number" && Number.isFinite(s.rulesetVersion)
+          ? s.rulesetVersion
+          : 0;
+      const generatorBuild =
+        typeof s.generatorBuild === "number" && Number.isFinite(s.generatorBuild)
+          ? s.generatorBuild
+          : 0;
       if (!seed || !chunkSize) {
         setC(null);
         return;
       }
       setC((prev) =>
-        prev?.worldSeed === seed && prev.chunkSize === chunkSize
+        prev &&
+        prev.worldSeed === seed &&
+        prev.chunkSize === chunkSize &&
+        prev.rulesetVersion === rulesetVersion &&
+        prev.generatorBuild === generatorBuild
           ? prev
-          : { worldSeed: seed, chunkSize },
+          : {
+              worldSeed: seed,
+              chunkSize,
+              rulesetVersion,
+              generatorBuild,
+            },
       );
     };
     room.onStateChange(sync);
@@ -384,6 +425,11 @@ function Scene({ room }: Props) {
   const ids = usePlayerSessionIds(room);
   const contract = useWorldContract(room);
   const heightFieldsRef = useRef<Map<string, ChunkHeightField>>(new Map());
+  const decorOverridesRef = useRef<DecorOverrides | undefined>(undefined);
+  const chunkPropsBuildsRef = useRef<ChunkPropsBuildsHandle>({
+    version: 0,
+    byChunkKey: new Map(),
+  });
   const sunRef = useRef<THREE.DirectionalLight>(null);
   const sunTarget = useMemo(() => new THREE.Object3D(), []);
   const getVisualY = useCallback(
@@ -413,6 +459,14 @@ function Scene({ room }: Props) {
   const originRingY = terrainCfg
     ? surfaceHeightAt(0, 0, terrainCfg) + 0.04
     : 0.04;
+
+  useEffect(() => {
+    const onDecorOverlay = (msg: DecorOverlayMessageV1) => {
+      if (!msg || msg.v !== 1) return;
+      decorOverridesRef.current = decorOverridesFromOverlayMessage(msg);
+    };
+    room.onMessage("decor_overlay", onDecorOverlay);
+  }, [room]);
 
   const colorFor = useCallback(
     (sessionId: string, i: number) => {
@@ -488,6 +542,25 @@ function Scene({ room }: Props) {
               if (field) heightFieldsRef.current.set(chunkKey, field);
               else heightFieldsRef.current.delete(chunkKey);
             }}
+          />
+          <ChunkPropsCoordinator
+            room={room}
+            localSessionId={localSessionId}
+            terrainCfg={terrainCfg}
+            chunkSize={contract.chunkSize}
+            decorContract={{
+              worldSeed: contract.worldSeed,
+              rulesetVersion: contract.rulesetVersion,
+              generatorBuild: contract.generatorBuild,
+            }}
+            heightFieldsRef={heightFieldsRef}
+            handleRef={chunkPropsBuildsRef}
+            decorOverridesRef={decorOverridesRef}
+          />
+          <ChunkPropsRenderer
+            buildsRef={chunkPropsBuildsRef}
+            room={room}
+            localSessionId={localSessionId}
           />
         </>
       ) : (

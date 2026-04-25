@@ -28,9 +28,9 @@ export type ChunkInterestPayload = {
   radius: number;
 };
 
-export async function joinWorld(endpoint: string, name: string): Promise<Room> {
+export async function joinWorld(endpoint: string, nameSeed: number): Promise<Room> {
   const client = new Client(endpoint);
-  const room = await client.joinOrCreate("world", { name });
+  const room = await client.joinOrCreate("world", { nameSeed });
   return room;
 }
 

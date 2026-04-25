@@ -2,6 +2,7 @@ import {
   canonicalWorldSeedFromRoomId,
   DEFAULT_CHUNK_SIZE,
   GENERATOR_BUILD,
+  neutralShortNameFromSeed,
   RULESET_VERSION,
   surfaceHeightAt,
   terrainConfigFromContract,
@@ -14,7 +15,7 @@ import { PlayerState, type PlayerInput, WorldState } from "../state.js";
 
 const PLAYER_HALF_HEIGHT = 0.55;
 
-type JoinOptions = { name?: string; requestedShard?: string };
+type JoinOptions = { name?: string; nameSeed?: number; requestedShard?: string };
 
 type ChunkInterestMsg = { radius?: number };
 
@@ -87,11 +88,13 @@ export class WorldRoom extends Room<WorldState> {
       // eslint-disable-next-line no-console
       console.log("[WorldRoom] requestedShard (ignored for MVP)", options.requestedShard);
     }
-    const name = (options?.name ?? "").trim().slice(0, 24) || "Player";
+    const seed = parseNameSeed(options?.nameSeed) ?? uint32FromSessionId(client.sessionId);
+    const base = neutralShortNameFromSeed(seed);
+    const name = uniquePlayerName(this.state.players, base);
 
     const p = new PlayerState();
     p.id = client.sessionId;
-    p.name = name;
+    p.name = name.slice(0, 24);
     p.x = 0;
     p.z = 0;
     p.yaw = 0;
@@ -151,5 +154,40 @@ function clamp(v: number, lo: number, hi: number): number {
 function clampInt(v: number, lo: number, hi: number, fallback: number): number {
   if (!Number.isFinite(v)) return fallback;
   return Math.max(lo, Math.min(hi, v));
+}
+
+const UINT32_MAX = 0xffffffff;
+
+function parseNameSeed(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const u = Math.floor(v);
+  if (u < 0 || u > UINT32_MAX) return null;
+  return u >>> 0;
+}
+
+function uint32FromSessionId(sessionId: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < sessionId.length; i++) {
+    h ^= sessionId.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function uniquePlayerName(
+  players: WorldState["players"],
+  base: string
+): string {
+  const used = new Set<string>();
+  for (const pl of players.values()) {
+    used.add(pl.name);
+  }
+  if (!used.has(base)) return base;
+  for (let n = 2; n < 10_000; n++) {
+    const candidate = `${base}-${n}`;
+    const clipped = candidate.length <= 24 ? candidate : candidate.slice(0, 24);
+    if (!used.has(clipped)) return clipped;
+  }
+  return base.slice(0, 20);
 }
 

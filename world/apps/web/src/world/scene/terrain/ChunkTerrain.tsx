@@ -29,19 +29,10 @@ export const CHUNK_VIEW_RADIUS = 2;
 /** Extra ring(s) of chunks to keep loaded to avoid visible pop-in. */
 export const CHUNK_PRELOAD_RADIUS = CHUNK_VIEW_RADIUS + 1;
 
-/** Fade response (lambda). Smaller => slower. */
-const TILE_FADE_LAMBDA = 0.35; // ~8–9s to reach ~95%
-
-/** Keep evicted tiles around long enough to fade out. */
-const EVICT_GRACE_MS = 12_000;
+/** Used by `ChunkPropsCoordinator` for deferred prop teardown when chunks leave the window. */
+export const EVICT_GRACE_MS = 12_000;
 
 const SEGMENTS_PER_CHUNK = 14;
-
-/** ~1 - exp(-λ dt) for stable smoothing across frame rates (use `useFrame` `delta`). */
-function dampExp(dt: number, lambda: number): number {
-  const t = Math.min(Math.max(dt, 0), 0.1);
-  return 1 - Math.exp(-lambda * t);
-}
 
 export type ChunkHeightField = {
   cx: number;
@@ -356,21 +347,12 @@ function buildChunkSurfaceGeometry(
   return { geom: g, heights, x0, z0 };
 }
 
-type ChunkItem = {
-  key: string;
-  startOpacity: number;
-  targetOpacity: number;
-  expiresAtMs: number | null;
-};
-
 function ChunkTile({
   chunkKeyProp,
   chunkSize,
   cfg,
   segments,
   baseMaterial,
-  startOpacity,
-  targetOpacity,
   onHeightField,
 }: {
   chunkKeyProp: string;
@@ -378,8 +360,6 @@ function ChunkTile({
   cfg: TerrainConfig;
   segments: number;
   baseMaterial: THREE.MeshStandardMaterial;
-  startOpacity: number;
-  targetOpacity: number;
   onHeightField: (chunkKey: string, field: ChunkHeightField | null) => void;
 }): React.ReactElement {
   const { cx, cz } = parseChunkKey(chunkKeyProp);
@@ -393,16 +373,12 @@ function ChunkTile({
 
   const material = useMemo(() => {
     const m = baseMaterial.clone();
-    m.transparent = true;
-    m.opacity = startOpacity;
-    m.depthWrite = false;
-
     // Ensure shader patch is preserved across clones.
     // `Material.clone()` does not reliably preserve custom `onBeforeCompile`.
     m.customProgramCacheKey = baseMaterial.customProgramCacheKey;
     m.onBeforeCompile = baseMaterial.onBeforeCompile;
     return m;
-  }, [baseMaterial, startOpacity]);
+  }, [baseMaterial]);
 
   useEffect(
     () => () => {
@@ -441,23 +417,8 @@ function ChunkTile({
     segments,
   ]);
 
-  const opacityRef = useRef(startOpacity);
-  useFrame((_, delta) => {
-    const k = dampExp(delta, TILE_FADE_LAMBDA);
-    const next = opacityRef.current + (targetOpacity - opacityRef.current) * k;
-    opacityRef.current = next;
-    material.opacity = next;
-    material.depthWrite = next >= 0.995;
-  });
-
-  const enableShadows = targetOpacity >= 0.995;
   return (
-    <mesh
-      geometry={built.geom}
-      material={material}
-      castShadow={enableShadows}
-      receiveShadow={enableShadows}
-    />
+    <mesh geometry={built.geom} material={material} castShadow receiveShadow />
   );
 }
 
@@ -516,57 +477,22 @@ export function ChunkTerrainCoordinator({
     [terrainMaterial],
   );
 
-  const centerRef = useRef<{ cx: number; cz: number }>({ cx: 0, cz: 0 });
-  const itemsRef = useRef<Map<string, ChunkItem>>(new Map());
-  const hasBootstrappedRef = useRef(false);
+  const loadedKeysRef = useRef<Set<string>>(new Set());
   const [rev, bump] = useState(0);
-
-  const opacityForChunkKey = useCallback((chunkKey: string): number => {
-    const { cx, cz } = parseChunkKey(chunkKey);
-    const dcx = Math.abs(cx - centerRef.current.cx);
-    const dcz = Math.abs(cz - centerRef.current.cz);
-    const ring = Math.max(dcx, dcz);
-    if (ring <= CHUNK_VIEW_RADIUS) return 1;
-    // Preload ring: visible but soft; tweak to taste (0 => invisible preload).
-    return 0.22;
-  }, []);
 
   const updateWindow = useCallback(
     (cx: number, cz: number) => {
-      centerRef.current = { cx, cz };
-      const now = performance.now();
       const wanted = chunkKeysInSquare(cx, cz, CHUNK_PRELOAD_RADIUS);
       const wantedSet = new Set(wanted);
-      const isBootstrap = !hasBootstrappedRef.current;
+      const keys = loadedKeysRef.current;
 
-      // Add/update wanted items.
-      for (const k of wanted) {
-        const existing = itemsRef.current.get(k);
-        const nextOpacity = opacityForChunkKey(k);
-        if (existing) {
-          existing.targetOpacity = nextOpacity;
-          existing.expiresAtMs = null;
-        } else {
-          itemsRef.current.set(k, {
-            key: k,
-            startOpacity: isBootstrap ? nextOpacity : 0,
-            targetOpacity: nextOpacity,
-            expiresAtMs: null,
-          });
-        }
+      for (const k of wanted) keys.add(k);
+      const toRemove: string[] = [];
+      for (const k of keys) {
+        if (!wantedSet.has(k)) toRemove.push(k);
       }
+      for (const k of toRemove) keys.delete(k);
 
-      if (isBootstrap) hasBootstrappedRef.current = true;
-
-      // Start fade-out for evicted items (keep mounted until grace expires).
-      for (const [k, item] of itemsRef.current) {
-        if (wantedSet.has(k)) continue;
-        if (item.expiresAtMs !== null) continue;
-        item.targetOpacity = 0;
-        item.expiresAtMs = now + EVICT_GRACE_MS;
-      }
-
-      // Report metrics similar to previous behavior (evictions counted on start of fade-out).
       reportChunkMetrics({
         loaded: wanted.length,
         evictionsDelta: 0,
@@ -578,10 +504,9 @@ export function ChunkTerrainCoordinator({
       } as ChunkInterestPayload);
       bump((v) => v + 1);
     },
-    [opacityForChunkKey, room],
+    [room],
   );
 
-  // Player-driven window updates (on chunk change).
   const prevCenterRef = useRef<string>("");
   useFrame(() => {
     const p = room.state.players.get(localSessionId);
@@ -599,35 +524,21 @@ export function ChunkTerrainCoordinator({
     });
   });
 
-  // Cleanup expired, fully-faded tiles (time-based; cheap and predictable).
-  useFrame(() => {
-    const now = performance.now();
-    let removed = false;
-    for (const [k, item] of itemsRef.current) {
-      if (item.expiresAtMs !== null && item.expiresAtMs <= now) {
-        itemsRef.current.delete(k);
-        removed = true;
-      }
-    }
-    if (removed) bump((v) => v + 1);
-  });
-
-  // Must reflect targetOpacity updates even when the set size stays the same.
-  // `rev` changes whenever we update window or remove expired tiles.
-  const items = useMemo(() => Array.from(itemsRef.current.values()), [rev]);
+  const chunkKeys = useMemo(
+    () => Array.from(loadedKeysRef.current),
+    [rev],
+  );
 
   return (
     <group>
-      {items.map((it) => (
+      {chunkKeys.map((key) => (
         <ChunkTile
-          key={it.key}
-          chunkKeyProp={it.key}
+          key={key}
+          chunkKeyProp={key}
           chunkSize={chunkSize}
           cfg={terrainCfg}
           segments={SEGMENTS_PER_CHUNK}
           baseMaterial={terrainMaterial}
-          startOpacity={it.startOpacity}
-          targetOpacity={it.targetOpacity}
           onHeightField={onHeightField}
         />
       ))}

@@ -66,6 +66,13 @@ export function PerfHud(): React.ReactElement {
         </span>
       </div>
       <div className="perfHudRow perfHudMuted">
+        <span className="perfHudLabel">decor</span>
+        <span className="perfHudValue">
+          inst {p.propsInstanceTotal} · mtx {fmt(p.propsLastMatrixBuildMs, 2)} ms · merge {fmt(p.propsLastMergeMs, 2)}{" "}
+          ms · clamp {p.propsMergeClampHits}
+        </span>
+      </div>
+      <div className="perfHudRow perfHudMuted">
         <span className="perfHudLabel">net</span>
         <span className="perfHudValue">
           patches/s {p.statePatchesPerSec} · out {p.outgoingSendsPerSec} msg/s · out {p.outgoingBytesPerSec} B/s · in{" "}

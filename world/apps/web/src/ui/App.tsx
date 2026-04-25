@@ -1,9 +1,16 @@
+import { neutralShortNameFromSeed } from "@aeliratv/shared-world";
 import React, { useMemo, useState } from "react";
 import { Game } from "../world/Game";
 
+function randomUint32(): number {
+  const u = new Uint32Array(1);
+  crypto.getRandomValues(u);
+  return u[0] ?? 0;
+}
+
 export function App() {
-  const [name, setName] = useState("");
-  const [joinedName, setJoinedName] = useState<string | null>(null);
+  const [nameSeed, setNameSeed] = useState(() => randomUint32());
+  const [joinedSeed, setJoinedSeed] = useState<number | null>(null);
 
   const endpoint = useMemo(() => {
     return (
@@ -11,41 +18,31 @@ export function App() {
     );
   }, []);
 
-  if (joinedName) {
+  if (joinedSeed !== null) {
     return (
       <div className="gameRoot">
         <Game
-          name={joinedName}
+          nameSeed={joinedSeed}
           endpoint={endpoint}
-          onExit={() => setJoinedName(null)}
+          onExit={() => setJoinedSeed(null)}
         />
       </div>
     );
   }
 
+  const preview = neutralShortNameFromSeed(nameSeed);
+
   return (
     <div className="shell">
       <div className="card">
         <div className="row">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
-            maxLength={24}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const n = name.trim();
-                if (n) setJoinedName(n);
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              const n = name.trim();
-              if (n) setJoinedName(n);
-            }}
-          >
+          <span className="namePreview" title="Generated name">
+            {preview}
+          </span>
+          <button type="button" onClick={() => setNameSeed(randomUint32())}>
+            Reroll
+          </button>
+          <button type="button" onClick={() => setJoinedSeed(nameSeed)}>
             Enter
           </button>
         </div>

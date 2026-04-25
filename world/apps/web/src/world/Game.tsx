@@ -7,12 +7,12 @@ import { joinWorld } from "./net.js";
 import { WorldCanvas } from "./scene/WorldCanvas";
 
 type Props = {
-  name: string;
+  nameSeed: number;
   endpoint: string;
   onExit: () => void;
 };
 
-export function Game({ name, endpoint, onExit }: Props) {
+export function Game({ nameSeed, endpoint, onExit }: Props) {
   const joinGenerationRef = useRef(0);
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export function Game({ name, endpoint, onExit }: Props) {
 
     (async () => {
       try {
-        const joinedRoom = await joinWorld(endpoint, name);
+        const joinedRoom = await joinWorld(endpoint, nameSeed);
         if (disposed || joinGenerationRef.current !== effectId) {
           try {
             joinedRoom?.leave?.();
@@ -52,7 +52,7 @@ export function Game({ name, endpoint, onExit }: Props) {
         return null;
       });
     };
-  }, [endpoint, name]);
+  }, [endpoint, nameSeed]);
 
   if (error) {
     return (

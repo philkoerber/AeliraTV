@@ -110,76 +110,6 @@ function cloneWithShadows(root: THREE.Object3D): THREE.Object3D {
   return c;
 }
 
-function createToonGradientMap(): THREE.DataTexture {
-  // 4-step gradient for simple banded lighting.
-  // This is intentionally tiny and uses nearest filtering.
-  const data = new Uint8Array([
-    24, 24, 24, 255, // darkest
-    90, 90, 90, 255,
-    170, 170, 170, 255,
-    255, 255, 255, 255, // brightest
-  ]);
-  const tex = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function applyLoFiPs1Materials(args: {
-  root: THREE.Object3D;
-  baseColor: string;
-  gradientMap: THREE.Texture;
-}): void {
-  const { root, baseColor, gradientMap } = args;
-
-  root.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
-
-    // Encourage faceted/low-poly look even if geometry is moderately dense.
-    if (o.geometry) {
-      o.geometry.computeVertexNormals();
-    }
-
-    const prev = o.material as THREE.Material | THREE.Material[] | undefined;
-    const prevMat =
-      Array.isArray(prev) ? (prev[0] as unknown) : (prev as unknown);
-    const prevAny = (prevMat ?? {}) as {
-      map?: THREE.Texture | null;
-    };
-
-    const isSkinned = o instanceof THREE.SkinnedMesh;
-    const toon = new THREE.MeshToonMaterial({
-      color: new THREE.Color(baseColor),
-      gradientMap,
-      transparent: false,
-    });
-    // three.js supports these flags; TS surface differs by version.
-    (toon as unknown as { skinning: boolean }).skinning = isSkinned;
-    (toon as unknown as { flatShading: boolean }).flatShading = true;
-
-    // Keep any authored texture but force lo-fi sampling.
-    if (prevAny.map) {
-      const map = prevAny.map;
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.magFilter = THREE.NearestFilter;
-      map.minFilter = THREE.NearestMipmapNearestFilter;
-      map.anisotropy = 1;
-      map.needsUpdate = true;
-      toon.map = map;
-    }
-
-    if (Array.isArray(o.material)) {
-      o.material = o.material.map(() => toon);
-    } else {
-      o.material = toon;
-    }
-  });
-}
-
 export function PlayerCharacter({
   room,
   sessionId,
@@ -208,16 +138,6 @@ export function PlayerCharacter({
 
   // Render mesh source: use the RunForward FBX (it includes the skinned mesh).
   const characterScene = useMemo(() => cloneWithShadows(runFwd), [runFwd]);
-
-  const toonGradientMap = useMemo(() => createToonGradientMap(), []);
-
-  useEffect(() => {
-    applyLoFiPs1Materials({
-      root: characterScene,
-      baseColor: color,
-      gradientMap: toonGradientMap,
-    });
-  }, [characterScene, color, toonGradientMap]);
 
   const clips = useMemo(() => {
     const out: THREE.AnimationClip[] = [];
