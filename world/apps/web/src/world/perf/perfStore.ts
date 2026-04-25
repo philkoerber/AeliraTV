@@ -7,6 +7,10 @@ export type PerfSnapshot = {
   p95FrameMs: number;
   frameSamples: number;
   fpsInstant: number;
+  /** Camera world position (often equals the "current coordinates" users care about). */
+  camX: number;
+  camY: number;
+  camZ: number;
   drawCalls: number;
   triangles: number;
   points: number;
@@ -39,6 +43,9 @@ export const perfSnapshot: PerfSnapshot = {
   p95FrameMs: Number.NaN,
   frameSamples: 0,
   fpsInstant: 0,
+  camX: Number.NaN,
+  camY: Number.NaN,
+  camZ: Number.NaN,
   drawCalls: 0,
   triangles: 0,
   points: 0,

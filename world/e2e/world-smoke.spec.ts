@@ -8,10 +8,8 @@ test("world: join, WebGL canvas, screenshot artifact", async ({ page }) => {
   await page.getByPlaceholder("Your name").fill("E2E");
   await page.getByRole("button", { name: "Enter" }).click();
 
-  await expect(page.getByText("WASD to move")).toBeVisible({ timeout: 90_000 });
-
   const canvas = page.locator("canvas").first();
-  await expect(canvas).toBeVisible({ timeout: 30_000 });
+  await expect(canvas).toBeVisible({ timeout: 90_000 });
 
   await page.waitForFunction(
     () => {

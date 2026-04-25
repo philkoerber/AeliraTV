@@ -75,19 +75,6 @@ export function Game({ name, endpoint, onExit }: Props) {
 
   return (
     <div style={{ height: "100%", minHeight: "100dvh", position: "relative", width: "100%" }}>
-      <div className="overlayTopLeft">
-        <div>
-          <strong>{name}</strong>
-          <span className="mvpSep">·</span>
-          <span className="mvpMuted">room {room.roomId}</span>
-        </div>
-        <div className="mvpHint" style={{ marginTop: 6 }}>
-          WASD to move. Click canvas to lock the mouse — drag to turn the camera (WoW-style). Esc unlocks.
-        </div>
-        <button type="button" className="mvpLeave" style={{ marginTop: 8 }} onClick={onExit}>
-          Leave
-        </button>
-      </div>
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <WorldCanvas room={room} />
       </div>

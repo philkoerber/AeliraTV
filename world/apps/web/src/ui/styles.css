@@ -81,20 +81,6 @@ button:hover {
   position: relative;
 }
 
-.overlayTopLeft {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 8px 10px;
-  border-radius: 10px;
-  backdrop-filter: blur(8px);
-}
-
 .mvpCenter {
   height: 100%;
   display: grid;
@@ -126,23 +112,6 @@ button:hover {
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
-}
-
-.mvpSep {
-  margin: 0 6px;
-  opacity: 0.5;
-}
-
-.mvpHint {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
-  line-height: 1.45;
-  max-width: 52ch;
-}
-
-.mvpLeave {
-  margin-top: 4px;
 }
 
 .mvpTableWrap {
@@ -186,24 +155,40 @@ button:hover {
   right: 10px;
   bottom: 10px;
   z-index: 2;
-  max-width: min(420px, calc(100vw - 24px));
-  padding: 8px 10px;
-  border-radius: 10px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 6px 8px;
+  border-radius: 9px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.32;
   color: rgba(235, 240, 250, 0.92);
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
   pointer-events: none;
+  text-align: right;
 }
 
 .perfHudTitle {
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   color: rgba(255, 255, 255, 0.55);
   letter-spacing: 0.02em;
+}
+
+.perfHudRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.perfHudLabel {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.perfHudValue {
+  text-align: right;
 }
 
 .perfHudOk {
@@ -219,7 +204,7 @@ button:hover {
 }
 
 .perfHudMuted {
-  margin-top: 2px;
+  margin-top: 1px;
   color: rgba(255, 255, 255, 0.55);
 }
 

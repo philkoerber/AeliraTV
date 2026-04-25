@@ -9,7 +9,7 @@ const RING_CAP = 180;
 
 export function PerfProbe(): null {
   const ringRef = useRef<FrameTimeRingBuffer | null>(null);
-  const { gl, clock } = useThree();
+  const { gl, clock, camera } = useThree();
 
   useEffect(() => {
     ringRef.current = new FrameTimeRingBuffer(RING_CAP);
@@ -33,6 +33,9 @@ export function PerfProbe(): null {
     perfSnapshot.p95FrameMs = p95Ms;
     perfSnapshot.frameSamples = count;
     perfSnapshot.fpsInstant = ms > 1e-6 ? 1000 / ms : 0;
+    perfSnapshot.camX = camera.position.x;
+    perfSnapshot.camY = camera.position.y;
+    perfSnapshot.camZ = camera.position.z;
     perfSnapshot.drawCalls = info.calls;
     perfSnapshot.triangles = info.triangles;
     perfSnapshot.points = info.points;

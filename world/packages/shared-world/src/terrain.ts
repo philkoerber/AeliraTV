@@ -25,8 +25,9 @@ export type TerrainConfig = {
 
 export function heightAt(x: number, z: number, cfg: TerrainConfig = {}): number {
   const seed = normalizeSeed(cfg.seed);
-  const frequency = cfg.frequency ?? 0.06;
-  const detailAmp = cfg.detailAmplitude ?? cfg.amplitude ?? 2.2;
+  // Slightly lower default frequency reduces micro-noise; compensate with macro amplitude.
+  const frequency = cfg.frequency ?? 0.05;
+  const detailAmp = cfg.detailAmplitude ?? cfg.amplitude ?? 2.0;
 
   // Domain rotation keeps features from lining up with world XZ travel axes.
   const c = 0.918_052_533_487_42;
@@ -38,15 +39,16 @@ export function heightAt(x: number, z: number, cfg: TerrainConfig = {}): number 
   const n1 = smoothGradientNoise2D(xr * frequency, zr * frequency, seed);
   const n2 = smoothGradientNoise2D(xr * frequency * 2, zr * frequency * 2, seed ^ 0x9e3779b9);
   const n3 = smoothGradientNoise2D(xr * frequency * 4, zr * frequency * 4, seed ^ 0x85ebca6b);
-  const detail = (n1 * 0.65 + n2 * 0.25 + n3 * 0.1) * detailAmp;
+  // Reduce the highest octave a bit to avoid "sparkle" while keeping shape.
+  const detail = (n1 * 0.68 + n2 * 0.26 + n3 * 0.06) * detailAmp;
 
   const macroFreq = cfg.macroFrequency ?? frequency * 0.175;
-  const macroAmp = cfg.macroAmplitude ?? 16;
+  const macroAmp = cfg.macroAmplitude ?? 22;
   const m1 = smoothGradientNoise2D(xr * macroFreq, zr * macroFreq, seed ^ 0x243f6a88);
   const m2 = smoothGradientNoise2D(xr * macroFreq * 2.05, zr * macroFreq * 2.05, seed ^ 0x243f6a89);
   const macroSmooth = (m1 * 0.62 + m2 * 0.38) * macroAmp;
 
-  const ridgeW = cfg.ridgeWeight ?? 0.58;
+  const ridgeW = cfg.ridgeWeight ?? 0.52;
   const ridgeN = smoothGradientNoise2D(
     xr * macroFreq * 1.88,
     zr * macroFreq * 1.88,

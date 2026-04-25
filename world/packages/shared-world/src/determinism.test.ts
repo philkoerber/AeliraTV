@@ -7,7 +7,7 @@ import { WalkClass, walkClassAt } from "./walkability.js";
 describe("terrainConfigFromContract", () => {
   it("is stable for a fixed seed string", () => {
     const cfg = terrainConfigFromContract({ worldSeed: "w:test-room" });
-    expect(heightAt(1.25, -3.5, cfg)).toBeCloseTo(8.029_021_981_850_43, 10);
+    expect(heightAt(1.25, -3.5, cfg)).toBeCloseTo(8.782_241_120_410_77, 10);
   });
 });
 
